@@ -20,6 +20,7 @@ import com.example.activitycounter.model.ActivityItem
 import com.example.activitycounter.ui.theme.ActivityCounterTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.activitycounter.data.ActivityViewModel
+import androidx.compose.material.icons.filled.Edit
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -49,18 +50,22 @@ fun MainScreen(
     modifier: Modifier = Modifier,
     viewModel: ActivityViewModel = viewModel()
 ) {
-    // Collect database state as Compose state
     val activities by viewModel.activities.collectAsState()
 
-    var showDialog by remember { mutableStateOf(false) }
+    // State for Add Dialog
+    var showAddDialog by remember { mutableStateOf(false) }
     var newActivityName by remember { mutableStateOf("") }
+
+    // State for Edit Dialog
+    var activityToEdit by remember { mutableStateOf<ActivityItem?>(null) }
+    var editActivityName by remember { mutableStateOf("") }
 
     val maxCount = activities.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
 
     Scaffold(
         modifier = modifier,
         floatingActionButton = {
-            FloatingActionButton(onClick = { showDialog = true }) {
+            FloatingActionButton(onClick = { showAddDialog = true }) {
                 Icon(Icons.Default.Add, contentDescription = "Add New")
             }
         }
@@ -77,18 +82,23 @@ fun MainScreen(
                     onDecrement = {
                         if (activity.count > 0) viewModel.updateCount(activity, activity.count - 1)
                     },
-                    onDelete = { viewModel.deleteActivity(activity) }
+                    onDelete = { viewModel.deleteActivity(activity) },
+                    onEdit = {
+                        activityToEdit = activity
+                        editActivityName = activity.name
+                    }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             }
         }
 
-        if (showDialog) {
+        // --- ADD DIALOG ---
+        if (showAddDialog) {
             val isDuplicate = viewModel.isNameDuplicate(newActivityName)
             val isBlank = newActivityName.isBlank()
 
             AlertDialog(
-                onDismissRequest = { showDialog = false },
+                onDismissRequest = { showAddDialog = false },
                 title = { Text("New Activity") },
                 text = {
                     Column {
@@ -97,11 +107,11 @@ fun MainScreen(
                             onValueChange = { newActivityName = it },
                             placeholder = { Text("e.g. Reading") },
                             singleLine = true,
-                            isError = isDuplicate // Highlights the field in red
+                            isError = isDuplicate
                         )
                         if (isDuplicate) {
                             Text(
-                                text = "This activity already exists",
+                                "This activity already exists",
                                 color = MaterialTheme.colorScheme.error,
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.padding(start = 16.dp, top = 4.dp)
@@ -114,16 +124,59 @@ fun MainScreen(
                         onClick = {
                             viewModel.addActivity(newActivityName.trim())
                             newActivityName = ""
-                            showDialog = false
+                            showAddDialog = false
                         },
-                        enabled = !isBlank && !isDuplicate // Disable button if invalid
+                        enabled = !isBlank && !isDuplicate
                     ) { Text("Add") }
                 },
                 dismissButton = {
                     TextButton(onClick = {
                         newActivityName = ""
-                        showDialog = false
+                        showAddDialog = false
                     }) { Text("Cancel") }
+                }
+            )
+        }
+
+        // --- EDIT DIALOG ---
+        if (activityToEdit != null) {
+            // Check if the new name is a duplicate (ignoring if they typed the exact same name it already has)
+            val isDuplicate = viewModel.isNameDuplicate(editActivityName) &&
+                    !editActivityName.equals(activityToEdit?.name, ignoreCase = true)
+            val isBlank = editActivityName.isBlank()
+
+            AlertDialog(
+                onDismissRequest = { activityToEdit = null },
+                title = { Text("Rename Activity") },
+                text = {
+                    Column {
+                        TextField(
+                            value = editActivityName,
+                            onValueChange = { editActivityName = it },
+                            singleLine = true,
+                            isError = isDuplicate
+                        )
+                        if (isDuplicate) {
+                            Text(
+                                "This name is already taken",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            activityToEdit?.let { viewModel.renameActivity(it, editActivityName) }
+                            activityToEdit = null
+                        },
+                        enabled = !isBlank && !isDuplicate
+                    ) { Text("Save") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { activityToEdit = null }) { Text("Cancel") }
                 }
             )
         }
@@ -136,7 +189,8 @@ fun ActivityRow(
     progress: Float,
     onIncrement: () -> Unit,
     onDecrement: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onEdit: () -> Unit // New callback for editing
 ) {
     Row(
         modifier = Modifier
@@ -145,16 +199,30 @@ fun ActivityRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
-            text = activity.name,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyLarge
-        )
+        // Wrap the Text and the Edit Icon in a Column/Row to keep it tidy
+        Row(
+            modifier = Modifier.weight(1.2f),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = activity.name,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "Edit",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
 
         LinearProgressIndicator(
             progress = { progress },
             modifier = Modifier
-                .weight(1f)
+                .weight(0.8f)
                 .height(8.dp),
             strokeCap = StrokeCap.Round
         )

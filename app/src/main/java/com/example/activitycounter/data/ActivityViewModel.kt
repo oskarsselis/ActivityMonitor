@@ -30,4 +30,8 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
     fun isNameDuplicate(name: String): Boolean {
         return activities.value.any { it.name.equals(name.trim(), ignoreCase = true) }
     }
+
+    fun renameActivity(activity: ActivityItem, newName: String) = viewModelScope.launch {
+        dao.update(activity.copy(name = newName.trim()))
+    }
 }
