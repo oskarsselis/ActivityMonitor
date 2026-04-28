@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ActivityDao {
-    @Query("SELECT * FROM activities ORDER BY id ASC")
+    @Query("SELECT * FROM activities ORDER BY count DESC, id ASC")
     fun getAllActivities(): Flow<List<ActivityItem>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
