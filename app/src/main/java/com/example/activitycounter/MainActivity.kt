@@ -78,10 +78,9 @@ fun MainScreen(
                 ActivityRow(
                     activity = activity,
                     progress = activity.count.toFloat() / maxCount.toFloat(),
-                    onIncrement = { viewModel.updateCount(activity, activity.count + 1) },
-                    onDecrement = {
-                        if (activity.count > 0) viewModel.updateCount(activity, activity.count - 1)
-                    },
+                    canIncrement = ActivityViewModel.canIncrement(activity),
+                    onIncrement = { viewModel.incrementCount(activity) },
+                    onDecrement = { viewModel.decrementCount(activity) },
                     onDelete = { viewModel.deleteActivity(activity) },
                     onEdit = {
                         activityToEdit = activity
@@ -187,11 +186,19 @@ fun MainScreen(
 fun ActivityRow(
     activity: ActivityItem,
     progress: Float,
+    canIncrement: Boolean,
     onIncrement: () -> Unit,
     onDecrement: () -> Unit,
     onDelete: () -> Unit,
     onEdit: () -> Unit // New callback for editing
 ) {
+    val isLocked = !canIncrement
+    val disabledColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+    val nameColor = if (isLocked) disabledColor else MaterialTheme.colorScheme.onSurface
+    val progressColor = if (isLocked) disabledColor else ProgressIndicatorDefaults.linearColor
+    val progressTrackColor = if (isLocked) disabledColor.copy(alpha = 0.12f)
+        else ProgressIndicatorDefaults.linearTrackColor
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -207,7 +214,8 @@ fun ActivityRow(
             Text(
                 text = activity.name,
                 style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f, fill = false)
+                color = nameColor,
+                modifier = Modifier.weight(1f)
             )
             IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
                 Icon(
@@ -224,6 +232,8 @@ fun ActivityRow(
             modifier = Modifier
                 .weight(0.8f)
                 .height(8.dp),
+            color = progressColor,
+            trackColor = progressTrackColor,
             strokeCap = StrokeCap.Round
         )
 
@@ -239,10 +249,15 @@ fun ActivityRow(
             Text(
                 text = "${activity.count}",
                 style = MaterialTheme.typography.bodyMedium,
+                color = if (isLocked) disabledColor else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.widthIn(min = 20.dp)
             )
 
-            IconButton(onClick = onIncrement, modifier = Modifier.size(36.dp)) {
+            IconButton(
+                onClick = onIncrement,
+                enabled = canIncrement,
+                modifier = Modifier.size(36.dp)
+            ) {
                 Icon(Icons.Default.Add, contentDescription = "Increase")
             }
         }
