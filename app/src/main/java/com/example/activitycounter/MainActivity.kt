@@ -5,268 +5,89 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Create
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.unit.dp
-import com.example.activitycounter.model.ActivityItem
-import com.example.activitycounter.ui.theme.ActivityCounterTheme
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.activitycounter.data.ActivityViewModel
-import androidx.compose.material.icons.filled.Edit
+import com.example.activitycounter.data.NotesViewModel
+import com.example.activitycounter.ui.activities.ActivitiesScreen
+import com.example.activitycounter.ui.notes.NoteEditorScreen
+import com.example.activitycounter.ui.notes.NotesScreen
+import com.example.activitycounter.ui.tasks.TasksScreen
+import com.example.activitycounter.ui.theme.ActivityCounterTheme
 
 class MainActivity : ComponentActivity() {
-    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             ActivityCounterTheme {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    topBar = {
-                        CenterAlignedTopAppBar(
-                            title = { Text("Activity Counter") }
-                        )
-                    }
-                ) { innerPadding ->
-                    MainScreen(modifier = Modifier.padding(innerPadding))
-                }
+                App()
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun MainScreen(
-    modifier: Modifier = Modifier,
-    viewModel: ActivityViewModel = viewModel()
-) {
-    val activities by viewModel.activities.collectAsState()
-
-    // State for Add Dialog
-    var showAddDialog by remember { mutableStateOf(false) }
-    var newActivityName by remember { mutableStateOf("") }
-
-    // State for Edit Dialog
-    var activityToEdit by remember { mutableStateOf<ActivityItem?>(null) }
-    var editActivityName by remember { mutableStateOf("") }
-
-    val maxCount = activities.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
-
-    Scaffold(
-        modifier = modifier,
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "Add New")
-            }
-        }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(bottom = 80.dp)
-        ) {
-            items(activities, key = { it.id }) { activity ->
-                ActivityRow(
-                    activity = activity,
-                    progress = activity.count.toFloat() / maxCount.toFloat(),
-                    canIncrement = ActivityViewModel.canIncrement(activity),
-                    onIncrement = { viewModel.incrementCount(activity) },
-                    onDecrement = { viewModel.decrementCount(activity) },
-                    onDelete = { viewModel.deleteActivity(activity) },
-                    onEdit = {
-                        activityToEdit = activity
-                        editActivityName = activity.name
-                    }
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-            }
-        }
-
-        // --- ADD DIALOG ---
-        if (showAddDialog) {
-            val isDuplicate = viewModel.isNameDuplicate(newActivityName)
-            val isBlank = newActivityName.isBlank()
-
-            AlertDialog(
-                onDismissRequest = { showAddDialog = false },
-                title = { Text("New Activity") },
-                text = {
-                    Column {
-                        TextField(
-                            value = newActivityName,
-                            onValueChange = { newActivityName = it },
-                            placeholder = { Text("e.g. Reading") },
-                            singleLine = true,
-                            isError = isDuplicate
-                        )
-                        if (isDuplicate) {
-                            Text(
-                                "This activity already exists",
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                            )
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            viewModel.addActivity(newActivityName.trim())
-                            newActivityName = ""
-                            showAddDialog = false
-                        },
-                        enabled = !isBlank && !isDuplicate
-                    ) { Text("Add") }
-                },
-                dismissButton = {
-                    TextButton(onClick = {
-                        newActivityName = ""
-                        showAddDialog = false
-                    }) { Text("Cancel") }
-                }
-            )
-        }
-
-        // --- EDIT DIALOG ---
-        if (activityToEdit != null) {
-            // Check if the new name is a duplicate (ignoring if they typed the exact same name it already has)
-            val isDuplicate = viewModel.isNameDuplicate(editActivityName) &&
-                    !editActivityName.equals(activityToEdit?.name, ignoreCase = true)
-            val isBlank = editActivityName.isBlank()
-
-            AlertDialog(
-                onDismissRequest = { activityToEdit = null },
-                title = { Text("Rename Activity") },
-                text = {
-                    Column {
-                        TextField(
-                            value = editActivityName,
-                            onValueChange = { editActivityName = it },
-                            singleLine = true,
-                            isError = isDuplicate
-                        )
-                        if (isDuplicate) {
-                            Text(
-                                "This name is already taken",
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                            )
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            activityToEdit?.let { viewModel.renameActivity(it, editActivityName) }
-                            activityToEdit = null
-                        },
-                        enabled = !isBlank && !isDuplicate
-                    ) { Text("Save") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { activityToEdit = null }) { Text("Cancel") }
-                }
-            )
-        }
-    }
+private enum class Tab(val label: String, val icon: ImageVector) {
+    ACTIVITIES("Activities", Icons.Default.CheckCircle),
+    NOTES("Notes", Icons.Default.Create),
+    TASKS("Tasks", Icons.AutoMirrored.Filled.List)
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ActivityRow(
-    activity: ActivityItem,
-    progress: Float,
-    canIncrement: Boolean,
-    onIncrement: () -> Unit,
-    onDecrement: () -> Unit,
-    onDelete: () -> Unit,
-    onEdit: () -> Unit // New callback for editing
-) {
-    val isLocked = !canIncrement
-    val disabledColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-    val nameColor = if (isLocked) disabledColor else MaterialTheme.colorScheme.onSurface
-    val progressColor = if (isLocked) disabledColor else ProgressIndicatorDefaults.linearColor
-    val progressTrackColor = if (isLocked) disabledColor.copy(alpha = 0.12f)
-        else ProgressIndicatorDefaults.linearTrackColor
+fun App(notesViewModel: NotesViewModel = viewModel()) {
+    var selectedTab by rememberSaveable { mutableStateOf(Tab.ACTIVITIES) }
+    // Keeps each tab's scroll position and expanded sections while another tab is shown
+    val tabStateHolder = rememberSaveableStateHolder()
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // Wrap the Text and the Edit Icon in a Column/Row to keep it tidy
-        Row(
-            modifier = Modifier.weight(1.2f),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = activity.name,
-                style = MaterialTheme.typography.bodyLarge,
-                color = nameColor,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = "Edit",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
+    Box {
+        Scaffold(
+            bottomBar = {
+                NavigationBar {
+                    Tab.entries.forEach { tab ->
+                        NavigationBarItem(
+                            selected = tab == selectedTab,
+                            onClick = { selectedTab = tab },
+                            icon = { Icon(tab.icon, contentDescription = null) },
+                            label = { Text(tab.label) }
+                        )
+                    }
+                }
+            },
+            // Each tab's own Scaffold handles the status bar
+            contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .padding(padding)
+                    .consumeWindowInsets(padding)
+            ) {
+                tabStateHolder.SaveableStateProvider(selectedTab.name) {
+                    when (selectedTab) {
+                        Tab.ACTIVITIES -> ActivitiesScreen()
+                        Tab.NOTES -> NotesScreen(notesViewModel)
+                        Tab.TASKS -> TasksScreen()
+                    }
+                }
             }
         }
 
-        LinearProgressIndicator(
-            progress = { progress },
-            modifier = Modifier
-                .weight(0.8f)
-                .height(8.dp),
-            color = progressColor,
-            trackColor = progressTrackColor,
-            strokeCap = StrokeCap.Round
-        )
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(
-                onClick = onDecrement,
-                modifier = Modifier.defaultMinSize(minWidth = 36.dp),
-                contentPadding = PaddingValues(0.dp)
-            ) {
-                Text("-", style = MaterialTheme.typography.titleLarge)
-            }
-
-            Text(
-                text = "${activity.count}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (isLocked) disabledColor else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.widthIn(min = 20.dp)
-            )
-
-            IconButton(
-                onClick = onIncrement,
-                enabled = canIncrement,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Increase")
-            }
-        }
-
-        IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-            Icon(
-                imageVector = Icons.Default.Delete,
-                contentDescription = "Delete",
-                tint = MaterialTheme.colorScheme.error
+        // Shown over the tabs so the notes list keeps its scroll position
+        notesViewModel.draft?.let { draft ->
+            NoteEditorScreen(
+                draft = draft,
+                onChange = notesViewModel::updateDraft,
+                onClose = notesViewModel::closeEditor,
+                onDelete = notesViewModel::deleteDraft,
+                onAppBackgrounded = notesViewModel::saveDraft
             )
         }
     }
